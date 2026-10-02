@@ -266,7 +266,7 @@ into `~/.claude` by hand.
 | `limit` without `limit_price` | DENY |
 | `limit` + `dollar_amount` | DENY — the schema would flip it to `market` |
 | `stop_market` / `stop_limit`, any session | DENY |
-| any order with notional > $1,200 | DENY |
+| any order with notional > $100 | DENY |
 | any order, when `jq` is not installed | DENY — the guard fails closed |
 
 **The guard depends on `jq` and fails closed without it.** Every rule above is
