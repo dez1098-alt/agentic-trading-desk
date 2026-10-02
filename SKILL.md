@@ -137,6 +137,8 @@ This returns the three-pillar scorecard + decision (EXIT / TRIM, EXIT, RE-ENTRY 
 
 If only raw indicators are needed: `python3 scripts/indicators.py ticker_input.json`.
 
+**Covered calls (Individual account, read-only).** When the user asks about buying back, rolling or being assigned on a short call they already hold, I fetch the quotes (`get_equity_quotes`, `get_option_quotes`) and run `python3 scripts/covered_call.py call_input.json`. It returns the buy-back cost, the roll credit/debit to a target strike and expiry, and the total result if assigned versus rolled. It is arithmetic only: it never places or prepares an order, and the user places any options order themselves. Input schema is in the script's docstring.
+
 ## Three-Pillar Framework (Standard Output Format)
 
 Each pillar ranges from **-2 to +2**:
