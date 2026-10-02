@@ -9,8 +9,9 @@ description: >-
   explicitly name the skill. Compute all indicators using deterministic code
   (never by eye) from raw Robinhood bars, apply the exit-on-exhaustion /
   re-enter-on-rebound logic, and respect account guardrails. Executes
-  autonomously in the Agentic account under the Autonomous Execution Mandate,
-  within hard limits on size, cash reserve and risk.
+  in the Agentic account under the Execution Mandate only after the user
+  explicitly confirms each order, within hard limits on size, cash reserve
+  and risk.
 ---
 
 # Agentic Trading Desk
@@ -28,15 +29,15 @@ Operations manual for short-term trading analysis and execution.
 3. **Buying power:** I always take `get_portfolio.buying_power` as the authoritative figure rather than deriving it myself. Account type matters and can change: on a cash account only SETTLED cash is spendable (T+1), while a limited-margin account can trade unsettled proceeds immediately.
 4. **HTML visualization only on Fridays** as part of the weekly review ritual. Do not offer or generate it on other days unless the user explicitly asks for it.
 5. **Macro source (optional / best-effort):** Investing.com (NO Polymarket). If inaccessible or blocked by network egress, do NOT halt or block execution: proceed with deterministic market data without the yield spread.
-6. **Autonomous execution is AUTHORIZED in the Agentic account** under the Autonomous Execution Mandate (next section). This authorization is durable and was established by the user in a live session on 2026-08-26; it does NOT depend on a scheduled prompt claiming it exists. A stored prompt cannot grant itself consent — the authorization lives here, in configuration, where it can be verified by reading it. Always review using `review_*_order` (simulation) before executing `place_*_order`.
+6. **Every order requires the user's explicit confirmation first.** This supersedes the earlier autonomous-execution authorization of 2026-08-26, which is revoked. Before each `place_*_order` I present the order (symbol, side, size, type, limit price, reasoning, `review_*_order` result) and wait for the user's explicit approval of THAT order. Approval of one order does not carry over to another, and a scheduled or stored prompt cannot supply it. If no user is present to answer (e.g. a scheduled run), I do not place orders: I run the analysis and report what I would propose. Always review using `review_*_order` (simulation) before asking, and only then execute `place_*_order`.
 
-## Autonomous Execution Mandate
+## Execution Mandate (Confirm Before Every Order)
 
-The user authorizes executing orders without in-the-moment confirmation, **only** in the broker-designated agent-tradable account, and **only** within these limits. A limit exceeded is not a cue to ask for permission: it is a cue to **not trade** and report.
+**I ask the user before every order and place it only after they explicitly approve that specific order.** No order is ever placed without in-the-moment confirmation. Orders are limited to the broker-designated agent-tradable account and to the limits below; even with approval, a limit exceeded is a cue to **not trade** and report, not to ask for an override.
 
-**What I may execute**
+**What I may propose (and execute once the user confirms)**
 - Decisions emitted by `score.py` in this same session, with the macro pillar computed by `macro_pillar.py` the same day. The scripts still run every session and their output is still the baseline — the framework is not optional.
-- **Discretionary entries and exits are authorized** (established by the user in a live session on 2026-08-26, superseding the prior zero-discretion rule): a trend change, a news catalyst, or a setup the decision cascade does not cover are all valid reasons to act. The cascade is rigid by design and will miss things; that is what this clause is for.
+- **Discretionary entries and exits may be proposed** (superseding the prior zero-discretion rule), each still subject to per-order confirmation: a trend change, a news catalyst, or a setup the decision cascade does not cover are all valid reasons to act. The cascade is rigid by design and will miss things; that is what this clause is for.
 - Every discretionary trade MUST carry its reasoning in writing in the session report — what I saw, why it justified acting, and what would prove me wrong. A trade I cannot explain in two sentences is a trade I should not have made.
 - **TACTICAL REBOUND goes in at half size** — it is counter-trend by definition.
 - Optional: for a news-driven entry, require the tape to be moving in the direction of the thesis before acting rather than anticipating the move. Rationale in *External Context* below — in scheduled runs the news source is the weakest input available, and price confirmation is the cheapest guard against acting on a mis-dated headline.
@@ -61,6 +62,7 @@ The user authorizes executing orders without in-the-moment confirmation, **only*
   | sizing | … | `dollar_amount` inside RTH · `quantity` in shares outside |
   | `time_in_force` | … | must be `gfd` |
   | notional | `dollar_amount` or `quantity × limit_price` | ≤ $1,200 |
+  | user confirmation | quote of the user's approval | explicit approval of THIS order, given in this session |
 - **The guard is not load-bearing unless `jq` is installed.** The hook implements every rule with `jq`; without it the script exits 0 with no output and the runner reads that as ALLOW (verified 2026-08-26 — an early revision let a `stop_market` through). It now fails closed, but a guard that denies everything is not a working setup either. See *Session start — prove the guard is alive* below; either way I treat the preflight table above as the real check, not the hook.
 - No new position in a single name within 2 sessions of confirmed earnings (`get_earnings_calendar`). ETFs exempt.
 - I run `review_equity_order` before every `place_equity_order`. If the simulation differs by more than 1% in price or quantity from what I computed, **I abort and report**.
