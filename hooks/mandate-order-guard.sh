@@ -14,7 +14,7 @@
 #                                             market fill hours later.
 #   Always                                 -> stop_market / stop_limit denied,
 #                                             time_in_force must be gfd,
-#                                             notional <= $1,200.
+#                                             notional <= $100.
 #
 # The clock split is the whole point: market orders fire only while the book is
 # deep and the session is live; everything else stays priced.
@@ -112,7 +112,7 @@ else
   fi
 fi
 
-# --- Notional cap ($1,200) --------------------------------------------------
+# --- Notional cap ($100) --------------------------------------------------
 # Enforced here rather than left to prose: it is the one limit checkable from the
 # payload alone, and the one whose breach costs real money.
 notional=""
@@ -123,9 +123,9 @@ elif [ -n "$qty" ] && [ -n "$lprice" ]; then
 fi
 
 if [ -n "$notional" ]; then
-  over=$(jq -nr --arg n "$notional" 'if ($n|tonumber) > 1200 then "1" else "0" end' 2>/dev/null)
+  over=$(jq -nr --arg n "$notional" 'if ($n|tonumber) > 100 then "1" else "0" end' 2>/dev/null)
   if [ "$over" = "1" ]; then
-    deny "MANDATE BLOCK ($side $sym): notional \$${notional} exceeds the \$1,200 per-order cap."
+    deny "MANDATE BLOCK ($side $sym): notional \$${notional} exceeds the \$100 per-order cap."
   fi
 fi
 

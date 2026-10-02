@@ -33,7 +33,7 @@ The system operates strictly within these boundaries. A limit exceeded is a dire
 - **TACTICAL REBOUND goes in at half size** — it is counter-trend by definition.
 
 **Hard limits**
-- Max **$1,200** per order.
+- Max **$100** per order.
 - Max **3 new positions** per session. Exits are uncapped.
 - Minimum **15% of account value held in cash**. I never touch that reserve.
 - **Order types: `limit` and `market` are both supported**:
@@ -48,7 +48,7 @@ The system operates strictly within these boundaries. A limit exceeded is a dire
   - `quote age`: top of book updated < 2 min ago; recent trade exists.
   - `limit_price`: limit orders only: within 0.3% of last trade.
   - `size`: `quantity` or `dollar_amount` (exactly one).
-  - `notional`: ≤ $1,200.
+  - `notional`: ≤ $100.
 - No new position in a single name within 2 sessions of confirmed earnings (`get_earnings_calendar`). ETFs exempt.
 - Run `review_equity_order` before every `place_equity_order`. If the simulation differs by more than 1% in price or quantity from computed targets, **abort and report**.
 
