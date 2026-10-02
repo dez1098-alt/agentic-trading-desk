@@ -42,7 +42,7 @@ The user authorizes executing orders without in-the-moment confirmation, **only*
 - Optional: for a news-driven entry, require the tape to be moving in the direction of the thesis before acting rather than anticipating the move. Rationale in *External Context* below — in scheduled runs the news source is the weakest input available, and price confirmation is the cheapest guard against acting on a mis-dated headline.
 
 **Hard limits**
-- Max **$1,200** per order.
+- Max **$100** per order.
 - Max **3 new positions** per session. Exits are uncapped.
 - Minimum **15% of account value held in cash**. I never touch that reserve.
 - **Order type follows the session clock** (rule set by Eli on 2026-08-26, replacing the earlier limit-only rule):
@@ -60,7 +60,7 @@ The user authorizes executing orders without in-the-moment confirmation, **only*
   | `limit_price` | … | outside RTH only: marketable, within 0.3% of last trade |
   | sizing | … | `dollar_amount` inside RTH · `quantity` in shares outside |
   | `time_in_force` | … | must be `gfd` |
-  | notional | `dollar_amount` or `quantity × limit_price` | ≤ $1,200 |
+  | notional | `dollar_amount` or `quantity × limit_price` | ≤ $100 |
 - **The guard is not load-bearing unless `jq` is installed.** The hook implements every rule with `jq`; without it the script exits 0 with no output and the runner reads that as ALLOW (verified 2026-08-26 — an early revision let a `stop_market` through). It now fails closed, but a guard that denies everything is not a working setup either. See *Session start — prove the guard is alive* below; either way I treat the preflight table above as the real check, not the hook.
 - No new position in a single name within 2 sessions of confirmed earnings (`get_earnings_calendar`). ETFs exempt.
 - I run `review_equity_order` before every `place_equity_order`. If the simulation differs by more than 1% in price or quantity from what I computed, **I abort and report**.
@@ -99,7 +99,7 @@ Load the tools with `tool_search` before using them (they are deferred).
 
 **Guard verification runs before any of this** — see *Session start — prove the guard is alive* in the Mandate. No order goes out in a session where the probe did not come back denied.
 
-**Session self-audit (first call of every run).** `get_equity_orders` on the agent-tradable account with `placed_agent="agentic"` since the previous session. An order is a Mandate breach by a prior run if it is a `stop_market` or `stop_limit`; if it is a `market` order whose `market_hours` field is anything other than `regular_hours`; if it carries a `dollar_amount` outside regular hours; if its `time_in_force` is not `gfd`; or if its notional exceeds $1,200. I check `type`, `market_hours`, `time_in_force` and notional on every order returned, and surface any breach in the push notification rather than letting it pass silently. The broker's order history is the only durable record — the execution container is ephemeral, so a breach that is not surfaced today is lost.
+**Session self-audit (first call of every run).** `get_equity_orders` on the agent-tradable account with `placed_agent="agentic"` since the previous session. An order is a Mandate breach by a prior run if it is a `stop_market` or `stop_limit`; if it is a `market` order whose `market_hours` field is anything other than `regular_hours`; if it carries a `dollar_amount` outside regular hours; if its `time_in_force` is not `gfd`; or if its notional exceeds $100. I check `type`, `market_hours`, `time_in_force` and notional on every order returned, and surface any breach in the push notification rather than letting it pass silently. The broker's order history is the only durable record — the execution container is ephemeral, so a breach that is not surfaced today is lost.
 
 **To analyze a ticker:**
 1. `Robinhood:get_equity_historicals` → ~290 daily bars (closes). This is the input for `indicators.py`. Request a range that yields ≥220 bars (ideal for EMA200).
