@@ -30,6 +30,8 @@ graph TD
 *   **[scripts/macro_pillar.py](scripts/macro_pillar.py)**: Macro regime detector and cross-asset sentiment scorer.
 *   **[scripts/score.py](scripts/score.py)**: Evaluator of the three-pillar framework and exit/entry decision engine.
 *   **[scripts/covered_call.py](scripts/covered_call.py)**: Read-only calculator for an existing short covered call: buy-back cost, roll credit/debit, and result if assigned vs rolled. Never places orders. Test: `bash tests/test-covered-call.sh`.
+*   **[scripts/watchlist_run.py](scripts/watchlist_run.py)**: One read-only watchlist check for the desk routines: SMA20/RSI14 on completed sessions, desk score with the desk rules (no counter-trend entries, SPY 200-day filter, earnings guard), dashboard flags, and tracker file updates. Test: `bash tests/test-desk-rules.sh`.
+*   **[scripts/backtest.py](scripts/backtest.py)**: Replays the desk score over saved daily bars and compares it with buy-and-hold (`--rules desk` or `--rules legacy`). Run it before changing any rule.
 *   **[gemini-spark/](gemini-spark/)**: Sanitized version of the skill and scripts compatible with Gemini Spark security policies.
 
 ---

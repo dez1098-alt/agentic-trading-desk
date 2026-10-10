@@ -234,13 +234,67 @@ def decide(ind: dict, trend: int, mom: int, macro: Optional[int],
 # Full Scorecard Card
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# Desk rules (approved 2026-10-10 after a 22-name backtest, Apr 2024 - Oct 2026)
+# --------------------------------------------------------------------------
+
+EARNINGS_GUARD_DAYS = 5
+
+
+def market_ok_from_spy(spy_close: list[float], length: int = 200) -> Optional[bool]:
+    """Market filter: True when SPY's last close is above its simple moving average
+    (200 days by default). None when there are not enough bars to tell."""
+    if len(spy_close) < length:
+        return None
+    return spy_close[-1] > sum(spy_close[-length:]) / length
+
+
+def apply_desk_rules(dec: dict, holding: Optional[bool],
+                     allow_tactical: bool = False,
+                     market_ok: Optional[bool] = None,
+                     days_to_earnings: Optional[int] = None,
+                     earnings_guard_days: int = EARNINGS_GUARD_DAYS) -> dict:
+    """
+    Turns raw entry signals into WATCH/WAIT when a desk rule blocks them:
+      - counter-trend TACTICAL REBOUND is not an entry (unless allow_tactical);
+      - no new entry while the market filter is off (SPY below its 200-day);
+      - no new entry within `earnings_guard_days` trading days of earnings.
+    Exit signals are never blocked. The original action is kept in raw_action.
+    """
+    action = dec["action"]
+    dec["raw_action"] = action
+    in_pos = holding is True
+    near_earnings = (days_to_earnings is not None
+                     and 0 <= days_to_earnings <= earnings_guard_days)
+    is_entry = not in_pos and (action.startswith("RE-ENTRY") or action.startswith("TACTICAL"))
+
+    if is_entry and action.startswith("TACTICAL") and not allow_tactical:
+        dec["action"] = "WATCH (counter-trend, not an entry)"
+        dec["framing"] = ("Counter-trend rebounds are not desk entries: in the backtest they "
+                          "averaged +0.19% per trade. Watch for a RE-ENTRY signal instead.")
+    elif is_entry and market_ok is False:
+        dec["action"] = "WAIT (market filter)"
+        dec["framing"] = ("Entry signal skipped: SPY is below its 200-day average, so the desk "
+                          "takes no new buys. " + dec["framing"])
+    elif is_entry and near_earnings:
+        dec["action"] = f"WAIT (earnings in {days_to_earnings} trading days)"
+        dec["framing"] = ("Entry signal skipped: earnings are too close, and one report can "
+                          "gap the stock past any plan. Re-check after the report.")
+    elif in_pos and near_earnings:
+        dec["framing"] += f" Earnings in {days_to_earnings} trading days: decide before the report."
+    return dec
+
+
 def score_symbol(close: list[float], macro_score: Optional[int] = None,
                  symbol: Optional[str] = None, holding: Optional[bool] = None,
-                 slope_lookback: int = 5) -> dict:
+                 slope_lookback: int = 5, allow_tactical: bool = False,
+                 market_ok: Optional[bool] = None,
+                 days_to_earnings: Optional[int] = None) -> dict:
     ind = I.compute(close, slope_lookback)
     t, t_detail = score_trend(ind)
     m, m_detail = score_momentum(ind)
     dec = decide(ind, t, m, macro_score, holding)
+    dec = apply_desk_rules(dec, holding, allow_tactical, market_ok, days_to_earnings)
     composite = t + m + (macro_score if macro_score is not None else 0)
     return {
         "symbol": symbol,
@@ -276,6 +330,8 @@ def render(card: dict) -> str:
     L.append(f"{'─'*54}")
     L.append(f"  ► {d['action']}  —  {d['rationale']}")
     L.append(f"    {d['framing']}")
+    if d.get("raw_action") and d["raw_action"] != d["action"]:
+        L.append(f"    raw signal before desk rules: {d['raw_action']}")
     f = d["flags"]
     if f["exhaustion"]:
         L.append(f"    exhaustion: {'; '.join(f['exhaustion'])}")
@@ -292,7 +348,7 @@ def render(card: dict) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Three pillars scoring + exit/re-entry decision.")
-    ap.add_argument("input", nargs="?", help="JSON: {symbol, close:[...], macro_score?, holding?}. Without file: self-test.")
+    ap.add_argument("input", nargs="?", help="JSON: {symbol, close:[...], macro_score?, holding?, allow_tactical?, market_ok?, days_to_earnings?}. Without file: self-test.")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -304,6 +360,9 @@ def main() -> int:
             macro_score=raw.get("macro_score"),
             symbol=raw.get("symbol"),
             holding=raw.get("holding"),
+            allow_tactical=bool(raw.get("allow_tactical", False)),
+            market_ok=raw.get("market_ok"),
+            days_to_earnings=raw.get("days_to_earnings"),
         )
     else:
         import math

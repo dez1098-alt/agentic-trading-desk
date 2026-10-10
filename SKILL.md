@@ -38,7 +38,7 @@ The user authorizes executing orders without in-the-moment confirmation, **only*
 - Decisions emitted by `score.py` in this same session, with the macro pillar computed by `macro_pillar.py` the same day. The scripts still run every session and their output is still the baseline — the framework is not optional.
 - **Discretionary entries and exits are authorized** (established by the user in a live session on 2026-08-26, superseding the prior zero-discretion rule): a trend change, a news catalyst, or a setup the decision cascade does not cover are all valid reasons to act. The cascade is rigid by design and will miss things; that is what this clause is for.
 - Every discretionary trade MUST carry its reasoning in writing in the session report — what I saw, why it justified acting, and what would prove me wrong. A trade I cannot explain in two sentences is a trade I should not have made.
-- **TACTICAL REBOUND goes in at half size** — it is counter-trend by definition.
+- **TACTICAL REBOUND is not an entry** (desk rule since 2026-10-10): `score.py` reports it as `WATCH (counter-trend, not an entry)`. Pass `allow_tactical: true` only to study it.
 - Optional: for a news-driven entry, require the tape to be moving in the direction of the thesis before acting rather than anticipating the move. Rationale in *External Context* below — in scheduled runs the news source is the weakest input available, and price confirmation is the cheapest guard against acting on a mis-dated headline.
 
 **Hard limits**
@@ -156,6 +156,18 @@ Report all three scores with their details, the total (-6..+6), and the decision
 - **HOLD (under review)** when holding a position with weak structure or momentum, but no full exit trigger yet: maintain while monitoring for further deterioration.
 - **WAIT (do not chase)** when flat with a healthy trend but no fresh trigger: entering mid-trend has poor R/R; wait for pullback to EMA20 and turn.
 - **STAY OUT / AVOID**, **HOLD / OBSERVE** (when holding) or **OBSERVE** (when flat) as appropriate.
+
+### Desk rules (approved 2026-10-10)
+
+A backtest of the score on the 22-name watchlist (Apr 2024 to Oct 2026, `scripts/backtest.py`) showed the legacy rules lost to buy-and-hold on every name. `score.py` now applies these rules after the cascade and keeps the original signal in `decision.raw_action`:
+
+1. **No counter-trend entries.** TACTICAL REBOUND becomes `WATCH (counter-trend, not an entry)`; it averaged +0.19% per trade.
+2. **Market filter.** Pass `market_ok` (SPY's last close above its 200-day average, see `market_ok_from_spy`). When it is false, an entry becomes `WAIT (market filter)`.
+3. **Earnings guard.** Pass `days_to_earnings` (trading days). Within 5, an entry becomes `WAIT (earnings in N trading days)`, and a holding gets a reminder.
+4. **Exits come from the score's EXIT / EXIT-TRIM signal.** A close below the 20-day average is an information line, not an exit trigger; in the backtest that rule cut the average trade to +0.30%.
+5. **Core position.** A position marked `"core": true` in the tracker (SPY) is held and never exited on signals.
+
+Exit signals are never blocked by these rules. Re-run `scripts/backtest.py` before changing any of them.
 
 ## External Context (News + Analysts — Non-Blocking / Optional)
 
