@@ -28,6 +28,7 @@ import datetime as dt
 import json
 import os
 import sys
+from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import score as S  # noqa: E402
@@ -53,15 +54,36 @@ def wilder_rsi(c: list[float], n: int = 14) -> float:
     return 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
 
 
-def trading_days_between(start: str, end: str) -> int:
-    """Weekdays after `start` up to and including `end` (holidays ignored)."""
+def trading_days_between(start: str, end: str) -> Optional[int]:
+    """Weekdays after `start` up to and including `end` (holidays ignored).
+    None when `end` is already past, so a stale earnings date never blocks entries."""
     d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+    if d1 < d0:
+        return None
     n, d = 0, d0
     while d < d1:
         d += dt.timedelta(days=1)
         if d.weekday() < 5:
             n += 1
     return n
+
+
+MIN_BARS = 20  # SMA20 and RSI14 need at least this many completed sessions
+
+
+def atomic_write(path: str, write, newline=None) -> None:
+    """Write to a temp file and rename over `path`, so a crash never leaves a
+    half-written tracker file behind."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", newline=newline) as f:
+        write(f)
+    os.replace(tmp, path)
+
+
+def _write_csv(f, fields, rows) -> None:
+    w = csv.DictWriter(f, fieldnames=fields, restval="")
+    w.writeheader()
+    w.writerows(rows)
 
 
 def short_action(a: str) -> str:
@@ -93,8 +115,8 @@ def run(args) -> int:
 
     for x in rows:
         s = x["symbol"]
-        if s not in quotes or s not in bars:
-            x["note"] = "no quote or bars this run"
+        if s not in quotes or s not in bars or len(bars[s]) < MIN_BARS:
+            x["note"] = "no quote or not enough bars this run"
             continue
         p, pc = quotes[s]
         c = bars[s]
@@ -141,12 +163,12 @@ def run(args) -> int:
     meta.pop("tsla_call", None)
 
     if not args.dry_run:
-        with open(watch_path, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-            w.writeheader()
-            w.writerows(rows)
-        with open(meta_path, "w") as f:
-            json.dump(meta, f, indent=1)
+        fields = list(rows[0].keys()) if rows else []
+        for x in rows:
+            fields += [k for k in x if k not in fields]
+        if fields:
+            atomic_write(watch_path, lambda f: _write_csv(f, fields, rows), newline="")
+        atomic_write(meta_path, lambda f: json.dump(meta, f, indent=1))
     print("\n".join(lines))
     return 0
 

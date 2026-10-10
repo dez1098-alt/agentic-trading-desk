@@ -41,6 +41,7 @@ check("market off below 200d", S.market_ok_from_spy([100.0] * 199 + [90.0]), Fal
 check("market unknown short history", S.market_ok_from_spy([100.0] * 50), None)
 check("trading days Fri->Thu", W.trading_days_between("2026-10-09", "2026-10-15"), 4)
 check("trading days same day", W.trading_days_between("2026-10-09", "2026-10-09"), 0)
+check("past earnings date ignored", W.trading_days_between("2026-10-10", "2026-10-01"), None)
 check("wilder rsi all gains", W.wilder_rsi([float(i) for i in range(30)]), 100.0)
 
 # watchlist_run end to end on a synthetic fixture (dry run and real write)
@@ -76,6 +77,12 @@ check("core position noted", "core, held" in rows["SPY"]["note"], True)
 meta = json.load(open(os.path.join(tmp, "agentic_meta.json")))
 check("position P/L updated", meta["positions"][1]["pl"], 1.0)
 check("stale tsla_call dropped", "tsla_call" in meta, False)
+# a name with too few bars is skipped, not scored on a bogus SMA20
+json.dump({"data": {"results": [{"symbol": "XLE", "bars": [{"begins_at": f"2025-01-{i+1:02d}T00:00:00Z", "open_price": "50", "close_price": str(90 + i)} for i in range(10)]}]}}, open(bf, "w"))
+r = subprocess.run(cmd, capture_output=True, text=True)
+rows = {x["symbol"]: x for x in csv.DictReader(open(os.path.join(tmp, "agentic_watch.csv")))}
+check("short history skipped", rows["XLE"]["note"], "no quote or not enough bars this run")
+check("no temp file left behind", os.path.exists(os.path.join(tmp, "agentic_watch.csv.tmp")), False)
 print(f"\n{fails} failure(s)")
 sys.exit(1 if fails else 0)
 PY

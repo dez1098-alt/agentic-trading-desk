@@ -263,13 +263,17 @@ into `~/.claude` by hand.
 
 | Order | Guard |
 |---|---|
-| `market` (+ `dollar_amount` or quantity), `market_hours=regular_hours` | ALLOW |
+| buy, `market` + `dollar_amount` ≤ $100, regular hours | ALLOW |
+| buy, `market` sized by `quantity` only (dollar size unknown) | DENY — the guard fails closed |
+| buy with both `dollar_amount` and `quantity` | DENY |
+| sell (exit), any size | ALLOW — exits are never capped |
 | `market`, any other `market_hours` | DENY |
 | `limit` + `limit_price`, fractional or whole | ALLOW |
 | `limit` without `limit_price` | DENY |
 | `limit` + `dollar_amount` | DENY — the schema would flip it to `market` |
 | `stop_market` / `stop_limit`, any session | DENY |
-| any order with notional > $100 | DENY |
+| buy with notional > $100 | DENY |
+| any number that is not plain (`$5000`, `5,000`, `10 shares`) | DENY |
 | any order, when `jq` is not installed | DENY — the guard fails closed |
 
 **The guard depends on `jq` and fails closed without it.** Every rule above is
@@ -292,10 +296,9 @@ nothing is lost when a container reboots:
 *   `PreToolUse` → `hooks/mandate-order-guard.sh` (the order guard itself).
 *   `SessionStart` → `scripts/session-setup.sh`, which installs `jq`, marks the
     guard executable, and **smoke-tests it** by feeding it a `stop_market` probe.
-    If the guard does not deny that probe, the setup script exits non-zero and
-    the session refuses to start. A guard that answers "allow" to a prohibited
-    order is not installed, it is decorative — better to block the session than
-    to trade behind a guard that is not evaluating anything.
+    If the guard does not deny that probe, the setup script prints a warning.
+    It does not block the session: without `jq` the guard already denies every
+    order, so a failed setup stops trading without stopping the watchlist checks.
 
 *   **Run from a checkout of this repo**: nothing to do beyond having it open as
     the project directory.
