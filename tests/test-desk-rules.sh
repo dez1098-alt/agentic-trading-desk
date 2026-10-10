@@ -42,6 +42,16 @@ check("market unknown short history", S.market_ok_from_spy([100.0] * 50), None)
 check("trading days Fri->Thu", W.trading_days_between("2026-10-09", "2026-10-15"), 4)
 check("trading days same day", W.trading_days_between("2026-10-09", "2026-10-09"), 0)
 check("past earnings date ignored", W.trading_days_between("2026-10-10", "2026-10-01"), None)
+def flags(h, hp):
+    ind = {"close": 100.0, "ema20": None, "ema50": None, "ema200": None, "ema20_slope": None,
+           "ema200_slope": None, "rsi14": None, "rsi14_prev": None, "macd_hist": h,
+           "macd_hist_prev": hp, "trix": None, "trix_signal": None, "trix_prev": None,
+           "trix_signal_prev": None, "percent_b": None, "bars_since_below_ema20": None}
+    return S._flags(ind)["rebound"]
+check("MACD uptick below zero is not a cross", flags(-1.9, -2.0), [])
+check("MACD cross above zero flagged", flags(0.1, -0.2), ["MACD histogram crossing above zero"])
+check("MACD from exactly zero flagged", flags(0.1, 0.0), ["MACD histogram crossing above zero"])
+check("MACD already positive not a cross", flags(0.3, 0.1), [])
 check("wilder rsi all gains", W.wilder_rsi([float(i) for i in range(30)]), 100.0)
 
 # watchlist_run end to end on a synthetic fixture (dry run and real write)

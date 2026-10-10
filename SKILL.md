@@ -165,7 +165,8 @@ A backtest of the score on the 22-name watchlist (Apr 2024 to Oct 2026, `scripts
 2. **Market filter.** Pass `market_ok` (SPY's last close above its 200-day average, see `market_ok_from_spy`). When it is false, an entry becomes `WAIT (market filter)`.
 3. **Earnings guard.** Pass `days_to_earnings` (trading days). Within 5, an entry becomes `WAIT (earnings in N trading days)`, and a holding gets a reminder.
 4. **Exits come from the score's EXIT / EXIT-TRIM signal.** A close below the 20-day average is an information line, not an exit trigger; in the backtest that rule cut the average trade to +0.30%.
-5. **Core position.** A position marked `"core": true` in the tracker (SPY) is held and never exited on signals.
+5. **MACD rebound flag needs a real cross above zero.** Before 2026-10-10 any uptick below zero counted; the backtest with the real cross: 163 trades, 58% win rate, +2.38% average trade (was 272, 49%, +1.99%).
+6. **Core position.** A position marked `"core": true` in the tracker (SPY) is held and never exited on signals.
 
 Exit signals are never blocked by these rules. Re-run `scripts/backtest.py` before changing any of them.
 

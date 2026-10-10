@@ -116,8 +116,11 @@ def _flags(ind: dict) -> dict:
     # --- Rebound / reversal (for re-entry) ---
     if rsi is not None and rsi_p is not None and rsi_p < 35 and rsi > rsi_p:
         rebound.append(f"RSI turning from oversold ({rsi_p:.0f}→{rsi:.0f})")
-    if hist is not None and hist_p is not None and hist > hist_p and hist_p < 0:
-        rebound.append("MACD histogram crossing bullishly")
+    # A real cross: the histogram was at or below zero and is now above it.
+    # (Before 2026-10-10 any uptick below zero counted; the backtest showed the
+    # real cross gives fewer but better entries.)
+    if hist is not None and hist_p is not None and hist > 0 >= hist_p:
+        rebound.append("MACD histogram crossing above zero")
     # Genuine recovery of EMA20: currently above EMA20, but closed below it within last 5 bars.
     # Without a recent dip, it is a normal uptrend, not a rebound.
     bsb = ind.get("bars_since_below_ema20")
