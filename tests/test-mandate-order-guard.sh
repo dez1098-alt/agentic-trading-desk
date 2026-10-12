@@ -66,11 +66,11 @@ check "limit_price with \$ denied" deny "$AH" \
 check "dollar_amount and quantity both set denied" deny "$RTH" \
   '{"symbol":"AAPL","side":"buy","type":"market","dollar_amount":"50","quantity":"1000","time_in_force":"gfd"}'
 
-# Sells are exits: never capped, so a position that grew past $100 can still be closed
+# Sells are exits: never capped, so a position that grew past $250 can still be closed
 check "market sell by quantity allowed" allow "$RTH" \
   '{"symbol":"IWM","side":"sell","type":"market","quantity":"0.354761","time_in_force":"gfd"}'
-check "after-hours sell above \$100 allowed" allow "$AH" \
-  '{"symbol":"XLE","side":"sell","type":"limit","quantity":"2","limit_price":"65","time_in_force":"gfd"}'
+check "after-hours sell above \$250 allowed" allow "$AH" \
+  '{"symbol":"XLE","side":"sell","type":"limit","quantity":"5","limit_price":"65","time_in_force":"gfd"}'
 check "sell with bad number still denied" deny "$RTH" \
   '{"symbol":"IWM","side":"sell","type":"market","quantity":"all","time_in_force":"gfd"}'
 

@@ -263,7 +263,7 @@ into `~/.claude` by hand.
 
 | Order | Guard |
 |---|---|
-| buy, `market` + `dollar_amount` ≤ $100, regular hours | ALLOW |
+| buy, `market` + `dollar_amount` ≤ $250, regular hours | ALLOW |
 | buy, `market` sized by `quantity` only (dollar size unknown) | DENY — the guard fails closed |
 | buy with both `dollar_amount` and `quantity` | DENY |
 | sell (exit), any size | ALLOW — exits are never capped |
@@ -272,7 +272,7 @@ into `~/.claude` by hand.
 | `limit` without `limit_price` | DENY |
 | `limit` + `dollar_amount` | DENY — the schema would flip it to `market` |
 | `stop_market` / `stop_limit`, any session | DENY |
-| buy with notional > $100 | DENY |
+| buy with notional > $250 | DENY |
 | any number that is not plain (`$5000`, `5,000`, `10 shares`) | DENY |
 | any order, when `jq` is not installed | DENY — the guard fails closed |
 
