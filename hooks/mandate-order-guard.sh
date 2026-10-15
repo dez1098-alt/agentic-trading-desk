@@ -14,7 +14,7 @@
 #                                             market fill hours later.
 #   Always                                 -> stop_market / stop_limit denied,
 #                                             time_in_force must be gfd,
-#                                             buy notional <= $250 (fails closed).
+#                                             buy notional <= $600 (fails closed).
 #
 # The clock split is the whole point: market orders fire only while the book is
 # deep and the session is live; everything else stays priced.
@@ -112,11 +112,11 @@ else
   fi
 fi
 
-# --- Notional cap ($250) --------------------------------------------------
+# --- Notional cap ($600) --------------------------------------------------
 # Enforced here rather than left to prose: it is the one limit checkable from the
 # payload alone, and the one whose breach costs real money. It applies to buys:
 # a sell can only return cash, and an exit must never be blocked because the
-# position grew past $250. Fails closed: a buy whose notional cannot be computed
+# position grew past $600. Fails closed: a buy whose notional cannot be computed
 # from the payload is denied, never waved through.
 is_num() { jq -ne --arg v "$1" '$v|tonumber' >/dev/null 2>&1; }
 
@@ -137,11 +137,11 @@ if [ "$side" != "sell" ]; then
     notional=$(jq -nr --arg q "$qty" --arg p "$lprice" '($q|tonumber) * ($p|tonumber)')
   fi
   if [ -z "$notional" ]; then
-    deny "MANDATE BLOCK ($side $sym): the order's dollar size cannot be checked against the \$250 cap. Size buys with dollar_amount in regular hours, or quantity plus limit_price outside them."
+    deny "MANDATE BLOCK ($side $sym): the order's dollar size cannot be checked against the \$600 cap. Size buys with dollar_amount in regular hours, or quantity plus limit_price outside them."
   fi
-  over=$(jq -nr --arg n "$notional" 'if ($n|tonumber) > 250 then "1" else "0" end')
+  over=$(jq -nr --arg n "$notional" 'if ($n|tonumber) > 600 then "1" else "0" end')
   if [ "$over" != "0" ]; then
-    deny "MANDATE BLOCK ($side $sym): notional \$${notional} exceeds the \$250 per-order cap."
+    deny "MANDATE BLOCK ($side $sym): notional \$${notional} exceeds the \$600 per-order cap."
   fi
 fi
 
