@@ -38,11 +38,11 @@ The user authorizes executing orders without in-the-moment confirmation, **only*
 - Decisions emitted by `score.py` in this same session, with the macro pillar computed by `macro_pillar.py` the same day. The scripts still run every session and their output is still the baseline — the framework is not optional.
 - **Discretionary entries and exits are authorized** (established by the user in a live session on 2026-08-26, superseding the prior zero-discretion rule): a trend change, a news catalyst, or a setup the decision cascade does not cover are all valid reasons to act. The cascade is rigid by design and will miss things; that is what this clause is for.
 - Every discretionary trade MUST carry its reasoning in writing in the session report — what I saw, why it justified acting, and what would prove me wrong. A trade I cannot explain in two sentences is a trade I should not have made.
-- **TACTICAL REBOUND goes in at half size** — it is counter-trend by definition.
+- **TACTICAL REBOUND is not an entry** (desk rule since 2026-10-10): `score.py` reports it as `WATCH (counter-trend, not an entry)`. Pass `allow_tactical: true` only to study it.
 - Optional: for a news-driven entry, require the tape to be moving in the direction of the thesis before acting rather than anticipating the move. Rationale in *External Context* below — in scheduled runs the news source is the weakest input available, and price confirmation is the cheapest guard against acting on a mis-dated headline.
 
 **Hard limits**
-- Max **$100** per order.
+- Max **$600** per order.
 - Max **3 new positions** per session. Exits are uncapped.
 - Minimum **15% of account value held in cash**. I never touch that reserve.
 - **Order type follows the session clock** (rule set by Eli on 2026-08-26, replacing the earlier limit-only rule):
@@ -60,7 +60,7 @@ The user authorizes executing orders without in-the-moment confirmation, **only*
   | `limit_price` | … | outside RTH only: marketable, within 0.3% of last trade |
   | sizing | … | `dollar_amount` inside RTH · `quantity` in shares outside |
   | `time_in_force` | … | must be `gfd` |
-  | notional | `dollar_amount` or `quantity × limit_price` | ≤ $100 |
+  | notional | `dollar_amount` or `quantity × limit_price` | ≤ $600 |
 - **The guard is not load-bearing unless `jq` is installed.** The hook implements every rule with `jq`; without it the script exits 0 with no output and the runner reads that as ALLOW (verified 2026-08-26 — an early revision let a `stop_market` through). It now fails closed, but a guard that denies everything is not a working setup either. See *Session start — prove the guard is alive* below; either way I treat the preflight table above as the real check, not the hook.
 - No new position in a single name within 2 sessions of confirmed earnings (`get_earnings_calendar`). ETFs exempt.
 - I run `review_equity_order` before every `place_equity_order`. If the simulation differs by more than 1% in price or quantity from what I computed, **I abort and report**.
@@ -99,7 +99,7 @@ Load the tools with `tool_search` before using them (they are deferred).
 
 **Guard verification runs before any of this** — see *Session start — prove the guard is alive* in the Mandate. No order goes out in a session where the probe did not come back denied.
 
-**Session self-audit (first call of every run).** `get_equity_orders` on the agent-tradable account with `placed_agent="agentic"` since the previous session. An order is a Mandate breach by a prior run if it is a `stop_market` or `stop_limit`; if it is a `market` order whose `market_hours` field is anything other than `regular_hours`; if it carries a `dollar_amount` outside regular hours; if its `time_in_force` is not `gfd`; or if its notional exceeds $100. I check `type`, `market_hours`, `time_in_force` and notional on every order returned, and surface any breach in the push notification rather than letting it pass silently. The broker's order history is the only durable record — the execution container is ephemeral, so a breach that is not surfaced today is lost.
+**Session self-audit (first call of every run).** `get_equity_orders` on the agent-tradable account with `placed_agent="agentic"` since the previous session. An order is a Mandate breach by a prior run if it is a `stop_market` or `stop_limit`; if it is a `market` order whose `market_hours` field is anything other than `regular_hours`; if it carries a `dollar_amount` outside regular hours; if its `time_in_force` is not `gfd`; or if its notional exceeds $600. I check `type`, `market_hours`, `time_in_force` and notional on every order returned, and surface any breach in the push notification rather than letting it pass silently. The broker's order history is the only durable record — the execution container is ephemeral, so a breach that is not surfaced today is lost.
 
 **To analyze a ticker:**
 1. `Robinhood:get_equity_historicals` → ~290 daily bars (closes). This is the input for `indicators.py`. Request a range that yields ≥220 bars (ideal for EMA200).
@@ -156,6 +156,19 @@ Report all three scores with their details, the total (-6..+6), and the decision
 - **HOLD (under review)** when holding a position with weak structure or momentum, but no full exit trigger yet: maintain while monitoring for further deterioration.
 - **WAIT (do not chase)** when flat with a healthy trend but no fresh trigger: entering mid-trend has poor R/R; wait for pullback to EMA20 and turn.
 - **STAY OUT / AVOID**, **HOLD / OBSERVE** (when holding) or **OBSERVE** (when flat) as appropriate.
+
+### Desk rules (approved 2026-10-10)
+
+A backtest of the score on the 22-name watchlist (Apr 2024 to Oct 2026, `scripts/backtest.py`) showed the legacy rules lost to buy-and-hold on every name. `score.py` now applies these rules after the cascade and keeps the original signal in `decision.raw_action`:
+
+1. **No counter-trend entries.** TACTICAL REBOUND becomes `WATCH (counter-trend, not an entry)`; it averaged +0.19% per trade.
+2. **Market filter.** Pass `market_ok` (SPY's last close above its 200-day average, see `market_ok_from_spy`). When it is false, an entry becomes `WAIT (market filter)`.
+3. **Earnings guard.** Pass `days_to_earnings` (trading days). Within 5, an entry becomes `WAIT (earnings in N trading days)`, and a holding gets a reminder.
+4. **Exits come from the score's EXIT / EXIT-TRIM signal.** A close below the 20-day average is an information line, not an exit trigger; in the backtest that rule cut the average trade to +0.30%.
+5. **MACD rebound flag needs a real cross above zero.** Before 2026-10-10 any uptick below zero counted; the backtest with the real cross: 163 trades, 58% win rate, +2.38% average trade (was 272, 49%, +1.99%).
+6. **Core position.** A position marked `"core": true` in the tracker (SPY) is held and never exited on signals.
+
+Exit signals are never blocked by these rules. Re-run `scripts/backtest.py` before changing any of them.
 
 ## External Context (News + Analysts — Non-Blocking / Optional)
 

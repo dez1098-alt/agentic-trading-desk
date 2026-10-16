@@ -30,6 +30,8 @@ graph TD
 *   **[scripts/macro_pillar.py](scripts/macro_pillar.py)**: Macro regime detector and cross-asset sentiment scorer.
 *   **[scripts/score.py](scripts/score.py)**: Evaluator of the three-pillar framework and exit/entry decision engine.
 *   **[scripts/covered_call.py](scripts/covered_call.py)**: Read-only calculator for an existing short covered call: buy-back cost, roll credit/debit, and result if assigned vs rolled. Never places orders. Test: `bash tests/test-covered-call.sh`.
+*   **[scripts/watchlist_run.py](scripts/watchlist_run.py)**: One read-only watchlist check for the desk routines: SMA20/RSI14 on completed sessions, desk score with the desk rules (no counter-trend entries, SPY 200-day filter, earnings guard), dashboard flags, and tracker file updates. Test: `bash tests/test-desk-rules.sh`.
+*   **[scripts/backtest.py](scripts/backtest.py)**: Replays the desk score over saved daily bars and compares it with buy-and-hold (`--rules desk` or `--rules legacy`). Run it before changing any rule.
 *   **[gemini-spark/](gemini-spark/)**: Sanitized version of the skill and scripts compatible with Gemini Spark security policies.
 
 ---
@@ -261,13 +263,17 @@ into `~/.claude` by hand.
 
 | Order | Guard |
 |---|---|
-| `market` (+ `dollar_amount` or quantity), `market_hours=regular_hours` | ALLOW |
+| buy, `market` + `dollar_amount` ≤ $600, regular hours | ALLOW |
+| buy, `market` sized by `quantity` only (dollar size unknown) | DENY — the guard fails closed |
+| buy with both `dollar_amount` and `quantity` | DENY |
+| sell (exit), any size | ALLOW — exits are never capped |
 | `market`, any other `market_hours` | DENY |
 | `limit` + `limit_price`, fractional or whole | ALLOW |
 | `limit` without `limit_price` | DENY |
 | `limit` + `dollar_amount` | DENY — the schema would flip it to `market` |
 | `stop_market` / `stop_limit`, any session | DENY |
-| any order with notional > $100 | DENY |
+| buy with notional > $600 | DENY |
+| any number that is not plain (`$5000`, `5,000`, `10 shares`) | DENY |
 | any order, when `jq` is not installed | DENY — the guard fails closed |
 
 **The guard depends on `jq` and fails closed without it.** Every rule above is
@@ -290,10 +296,9 @@ nothing is lost when a container reboots:
 *   `PreToolUse` → `hooks/mandate-order-guard.sh` (the order guard itself).
 *   `SessionStart` → `scripts/session-setup.sh`, which installs `jq`, marks the
     guard executable, and **smoke-tests it** by feeding it a `stop_market` probe.
-    If the guard does not deny that probe, the setup script exits non-zero and
-    the session refuses to start. A guard that answers "allow" to a prohibited
-    order is not installed, it is decorative — better to block the session than
-    to trade behind a guard that is not evaluating anything.
+    If the guard does not deny that probe, the setup script prints a warning.
+    It does not block the session: without `jq` the guard already denies every
+    order, so a failed setup stops trading without stopping the watchlist checks.
 
 *   **Run from a checkout of this repo**: nothing to do beyond having it open as
     the project directory.
